@@ -9,6 +9,7 @@ pymongo = "*"
 pytest = "*"
 pytest-flask = "*"
 coverage = "*"
+flask-cors = "*"
 
 [dev-packages]
 pylint = "*"
@@ -17,4 +18,4 @@ pytest-cov = "*"
 black = "*"
 
 [requires]
-python_version = "3.10"
+python_version = "3.11"

@@ -1,0 +1,12 @@
+numpy
+librosa
+SoundFile
+pymongo
+joblib
+scikit-learn
+black
+pylint
+pytest
+pytest-cov
+coverage
+

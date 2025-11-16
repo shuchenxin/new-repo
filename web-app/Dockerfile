@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN pip install pipenv
 COPY Pipfile Pipfile.lock ./
 
 # Install dependencies
-RUN pipenv install --deploy --ignore-pipfile
+RUN pipenv install
 
 # Copy application code
 COPY . .
