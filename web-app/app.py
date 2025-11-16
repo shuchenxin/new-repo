@@ -4,13 +4,27 @@ Music classification: Vocal vs Instrumental.
 """
 
 from datetime import datetime
+import os
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request, redirect, url_for
+from werkzeug.utils import secure_filename
 
 from database import get_database
+from gridfs import GridFS
+
+from flask_cors import CORS
 
 app = Flask(__name__)
 app.config.from_object("config.Config")
+
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=False,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "OPTIONS"],
+    max_age=86400,
+)
 
 
 @app.route("/")
@@ -81,6 +95,61 @@ def api_stats():
                 round(instrumental / total * 100, 2) if total > 0 else 0
             ),
         }
+    )
+
+
+@app.route("/upload", methods=["POST", "OPTIONS"])
+def upload_audio():
+    """Handle audio file uploads from the dashboard."""
+    # Handle preflight (already handled in before_request), keep for clarity
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    # Accept either 'file' (from frontend) or 'audio_file' (legacy)
+    file = request.files.get("file") or request.files.get("audio_file")
+    if file is None or file.filename == "":
+        return jsonify({"ok": False, "error": "No file provided"}), 400
+
+    filename = secure_filename(file.filename)
+
+    upload_dir = app.config.get(
+        "UPLOAD_FOLDER",
+        os.path.join(os.path.dirname(__file__), "uploads"),
+    )
+    os.makedirs(upload_dir, exist_ok=True)
+
+    save_path = os.path.join(upload_dir, filename)
+    file.save(save_path)
+
+    # Save the uploaded audio into MongoDB (GridFS)
+    db = get_database()
+    fs = GridFS(db)
+    try:
+        with open(save_path, "rb") as f:
+            mongo_file_id = fs.put(
+                f,
+                filename=filename,
+                content_type=getattr(file, "mimetype", None),
+                upload_time=datetime.utcnow(),
+                status="pending",
+                source="web-upload",
+                original_path=save_path,
+            )
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Failed to store file in MongoDB: {exc}"}), 500
+
+    # Optionally enqueue for ML processing here
+    return (
+        jsonify(
+            {
+                "ok": True,
+                "filename": filename,
+                "path": save_path,
+                "mongo_file_id": str(mongo_file_id),
+                "status": "pending",
+            }
+        ),
+        201,
     )
 
 
